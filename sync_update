@@ -1,0 +1,151 @@
+#!/bin/bash
+#
+# COMMENT
+#
+
+
+: ${CONFIG_FILE:="config_mgmt.cfg"}
+
+. ./config_mgmt_functions
+
+usage() {
+   # TODO: Explain how it works
+	echo "Usage: "
+	echo "       $0 [-?] -e environment [-m machine]"
+	echo ""
+	echo ""
+	echo "Synchronizes files from remote environments or machines locally"
+	echo "Depending on type of server, it synchronizes certain files and folders"
+	echo "Types of servers are:"
+	echo "  fe, be, admin"
+	echo "Configuration is done in ${CONFIG_FILE}. This configuration file can be overriden"
+	echo "setting CONFIG_FILE environment variable"
+	echo ""
+	echo "Contents of config file are:"
+	echo ""
+	echo "[local]"
+	echo "backupdir=BASEDIR_TO_STORE_FILES_LOCALLY"
+	echo "user=REMOTEUSER" 
+	echo "logfile=LOGFILE"
+	echo "fe_files=RSYNC_INCLUSION_PATTERN_FILE_FOR_FE"
+	echo "be_files=RSYNC_INCLUSION_PATTERN_FILE_FOR_BE"
+	echo ""
+	echo "[environments]"
+	echo "environments=LIST_OF_ENVIRONMENTS (Space separated)"
+	echo ""
+	echo "[env1]"
+	echo "machines=LIST_OF_MACHINES (Space separated)"
+	echo "fe=LIST_OF_FE_MACHINES (Space separated)"
+	echo "be=LIST_OF_BE_MACHINES (Space separated)"
+	echo "admin=LIST_OF_ADMIN_MACHINES (Space separated)"
+	echo ""
+	echo "[env2]"
+	echo "..."
+	echo ""
+	exit 250
+}
+
+# invoke  usage
+# call usage() function if filename not supplied
+if [[ "$1" == "-?" ]]; then usage; fi
+
+
+#
+#
+#
+function initializeVariables() {
+   BACKUPDIR=${backupdir}
+   USER=${user}
+   LOG_FILE=${logfile}
+}
+
+#
+# Sinchronizes remote files and folders in local dir
+#
+function do_SyncUpdate(){
+   local _backupdir
+
+   # Loads configuration for given environment
+   
+   #
+   # TODO: If environment does not exist, error here
+   #
+   if [ $(existEnvironment ${ENVIRONMENT}) -eq 1 ]; then
+      cfg_section_${ENVIRONMENT}
+   else
+      echo "${ENVIRONMENT} environment is not declared in configuration file"
+      exit 255
+   fi 
+   
+   #
+   # Synchronization logic
+   #
+   if [ ! -z ${MACHINE} ]; then
+      _backupdir="${BACKUPDIR}/${ENVIRONMENT}/${MACHINE}"
+      echo "Syncrhonizing machine  ${MACHINE} in ${ENVIRONMENT}"
+      if [ $(isFE ${ENVIRONMENT} $MACHINE) -eq 1 ]; then
+         backup_files ${fe_files} ${_backupdir} ${ENVIRONMENT} ${MACHINE} ${USER} ${num_backups}
+#         diff_withremote_files ${fe_files} ${_backupdir} ${ENVIRONMENT} ${MACHINE} ${USER}
+      else if [ $(isBE ${ENVIRONMENT} $MACHINE) -eq 1 ]; then
+               backup_files ${be_files} ${_backupdir} ${ENVIRONMENT} ${MACHINE} ${USER} ${num_backups}
+           fi  
+      fi            
+   else
+      echo "Syncrhonizing environment ${ENVIRONMENT}"
+      for machine in ${machines[@]}
+      do
+         _backupdir="${BACKUPDIR}/${ENVIRONMENT}/${machine}"
+         echo "Syncrhonizing machine  ${machine} in ${ENVIRONMENT}"
+         if [ $(isFE ${ENVIRONMENT} $machine) -eq 1 ]; then
+            backup_files ${fe_files} ${_backupdir} ${ENVIRONMENT} ${machine} ${USER} ${num_backups}
+         else if [ $(isBE ${ENVIRONMENT} $machine) -eq 1 ]; then
+            backup_files ${be_files} ${_backupdir} ${ENVIRONMENT} ${machine} ${USER} ${num_backups}
+              fi
+         fi              
+      done
+   fi   
+}
+
+
+#
+# Parses command line arguments for script and check required params
+#
+function parse_options() {
+   local _configured=0
+   
+   while getopts "m:e:" opt "$@"; do
+     case $opt in
+       m)
+         MACHINE=$OPTARG
+         ;;
+       e)
+         ENVIRONMENT=$OPTARG
+         _configured=1
+         ;;
+       \?)
+         echo "Invalid option: -$OPTARG" >&2
+         ;;
+      esac
+   done
+   if [ ${_configured} -eq 0 ]; then
+      echo "No environment has been specified"
+      usage
+   else
+      echo "Configuration ready"   
+      echo "Environment: ${ENVIRONMENT}"
+      echo "Machine: ${MACHINE}"
+      echo "Backup dir: ${BACKUPDIR}"
+   fi   
+}
+
+cfg_parser "${CONFIG_FILE}"
+cfg_section_local
+cfg_section_environments
+
+# Initialize variables and folders
+initializeVariables
+
+# Parse command line
+parse_options $*
+
+do_SyncUpdate

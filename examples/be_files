@@ -1,0 +1,67 @@
+# + /etc/cron.d/sysstat
++ /etc
++ /etc/hosts
++ /etc/sysctl.conf
++ /etc/profile
+# + /etc/sudoers
++ /etc/inittab
++ /etc/fstab
++ /etc/oraInst.loc
++ /etc/sysconfig
++ /etc/sysconfig/hwconf
++ /etc/sysconfig/network
++ /etc/sysconfig/mesv6-managed-server
++ /etc/sysconfig/sysstat
++ /etc/sysconfig/static-routes
++ /etc/sysconfig/network-scripts
++ /etc/sysconfig/network-scripts/ifcfg-*
++ /etc/rc.d/
++ /etc/rc.d/init.d/
++ /etc/rc.d/init.d/mesv6-managed-server
++ /etc/rc.d/init.d/mesv6-cache-server
++ /etc/init.d/
++ /etc/profile.d/***
+# User mes
++ /home
++ /home/mes
++ /home/mes/.mesv6
++ /home/mes/.bashrc
++ /home/mes/bin/***
++ /opt
++ /opt/mesv6
++ /opt/mesv6/user_projects
++ /opt/mesv6/certificates
++ /opt/mesv6/certificates/***
+# Managed server
++ /opt/mesv6/user_projects/mserver
++ /opt/mesv6/user_projects/mserver/domains
++ /opt/mesv6/user_projects/mserver/domains/mesv6
++ /opt/mesv6/user_projects/mserver/domains/mesv6/bin/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/config/config.xml
++ /opt/mesv6/user_projects/mserver/domains/mesv6/config/mesv6/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/config/jdbc/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/config/jms/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/config/ldap/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/config/osb/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/config/diagnostics/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/config/nodemanager/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/config/fmwconfig/servers/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/lib/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/mesv6_libs/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/coherence/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/post_install/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/patches/***
++ /opt/mesv6/user_projects/mserver/domains/mesv6/configfwkdebug.xml
++ /opt/mesv6/user_projects/mserver/domains/mesv6/domain.properties
++ /opt/mesv6/user_projects/mserver/domains/mesv6/fileRealm.properties
+# Managed apps
+# CEP
++ /opt/mesv6/user_projects/domains/mesv6-ocep/*.sh
++ /opt/mesv6/user_projects/domains/mesv6-ocep/mesv6_be_ocep?/*.sh
++ /opt/mesv6/user_projects/domains/mesv6-ocep/mesv6_be_ocep?/modules/***
++ /opt/mesv6/user_projects/domains/mesv6-ocep/mesv6_be_ocep?/config/config.xml
++ /opt/mesv6/user_projects/domains/mesv6-ocep/mesv6_be_ocep?/config/log4j.properties
++ /opt/mesv6/user_projects/domains/mesv6-ocep/mesv6_be_ocep?/config/security.xml
++ /opt/mesv6/user_projects/domains/mesv6-ocep/mesv6_be_ocep?/config/security-config.xml
++ /opt/mesv6/user_projects/domains/mesv6-ocep/mesv6_be_ocep?/deployments.xml
+- *

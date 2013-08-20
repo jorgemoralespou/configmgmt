@@ -1,0 +1,329 @@
+# -*-Shell-script-*-
+#
+# Collects files from remote machines using rsync
+#
+#
+#
+# Idea from: http://troy.jdmz.net/rsync/index.html
+#
+
+
+SETCOLOR_SUCCESS="echo -en \\033[1;32m"
+SETCOLOR_INFO="echo -en \\033[1;36m"
+SETCOLOR_FAILURE="echo -en \\033[1;31m"
+SETCOLOR_NORMAL="echo -en \\033[0;39m"
+
+echo_ok() {
+  $SETCOLOR_SUCCESS
+  echo -n $1
+  $SETCOLOR_NORMAL
+  echo ""
+  return 0
+}
+
+echo_info() {
+  $SETCOLOR_INFO
+  echo -n $1
+  $SETCOLOR_NORMAL
+  echo ""
+  return 0
+}
+
+echo_nook() {
+  $SETCOLOR_FAILURE
+  echo -n $1
+  $SETCOLOR_NORMAL
+  echo ""
+  return 0
+}
+
+#
+#
+#
+#
+# Idea from: http://ajdiaz.wordpress.com/2008/02/09/bash-ini-parser/
+#
+# # parse the config file called 'myfile.ini', with the following contents::
+#   [sec2]
+#   var2='something'
+# cfg_parser 'myfile.ini'
+# 
+# # enable section called 'sec2' (in the file [sec2]) for reading
+# cfg_section_sec2
+#  
+# # read the content of the variable called 'var2' (in the file
+# # var2=XXX). If your var2 is an array, then you can use
+# # ${var[index]} Only item
+# # ${var[@]} Whole array
+# # ${var} First item of array
+# echo "$var2"
+#
+#
+# Parses config files
+#
+cfg_parser ()
+{
+    ini="$(<$1)"                # read the file
+    ini="${ini//[/\[}"          # escape [
+    ini="${ini//]/\]}"          # escape ]
+    IFS=$'\n' && ini=( ${ini} ) # convert to line-array
+    ini=( ${ini[*]//;*/} )      # remove comments with ;
+    ini=( ${ini[*]/\    =/=} )  # remove tabs before =
+    ini=( ${ini[*]/=\   /=} )   # remove tabs be =
+    ini=( ${ini[*]/\ =\ /=} )   # remove anything with a space around =
+    ini=( ${ini[*]/#\\[/\}$'\n'cfg_section_} ) # set section prefix
+    ini=( ${ini[*]/%\\]/ \(} )    # convert text2function (1)
+    ini=( ${ini[*]/=/=\( } )    # convert item to array
+    ini=( ${ini[*]/%/ \)} )     # close array parenthesis
+    ini=( ${ini[*]/%\\ \)/ \\} ) # the multiline trick
+    ini=( ${ini[*]/%\( \)/\(\) \{} ) # convert text2function (2)
+    ini=( ${ini[*]/%\} \)/\}} ) # remove extra parenthesis
+    ini[0]="" # remove first element
+    ini[${#ini[*]} + 1]='}'    # add the last brace
+    eval "$(echo "${ini[*]}")" # eval the result
+}
+ 
+#
+# Writes config files
+#
+cfg_writer ()
+{
+    IFS=' '$'\n'
+    fun="$(declare -F)"
+    fun="${fun//declare -f/}"
+    for f in $fun; do
+        [ "${f#cfg_section}" == "${f}" ] && continue
+        item="$(declare -f ${f})"
+        item="${item##*\{}"
+        item="${item%\}}"
+        item="${item//=*;/}"
+        vars="${item//=*/}"
+        eval $f
+        echo "[${f#cfg_section_}]"
+        for var in $vars; do
+            echo $var=\"${!var}\"
+        done
+    done
+}
+
+#
+# Arguments:
+#   $1: file
+#
+function dir_name (){
+   local _filename
+   local _directory
+   local FILE
+   
+   FILE="$1"
+   _filename="${FILE##*/}"                           # Strip longest match of */ from start
+   _directory="${FILE:0:${#FILE} - ${#_filename}}"    # Substring from 0 thru pos of filename
+   echo "$_directory"
+}
+
+#
+# Arguments:
+#   $1: backup_dir
+#   $3: environment
+#   $2: machine
+#
+function ensure_dir (){
+   # Ensure directory is created
+   if [ ! -e ${1} ]
+   then 
+      echo "${1} does not exist. Attempting to create it"
+      mkdir -p ${1}
+   fi
+}
+
+
+#
+# Backups remote file or folder in local folder. Creates a number of local backups
+#    $1=remote
+#    $2=local folder
+#    $3=environment
+#    $4=machine
+#    $5=user
+#    $6=number of backups to retain
+#
+function backup_files () {
+   local _remote_filelist=$1
+   local _local_dir=$2
+   local _environment=$3
+   local _machine=$4
+   local _user=$5
+   declare -i _numbackups=${num_backups}
+   
+   ensure_dir ${_local_dir}
+   
+   local _latest_dir=${_local_dir}/latest 
+   local _backup0=${_local_dir}/backup.0 
+   local _backup1=${_local_dir}/backup.1
+
+   # Synchronize
+   # Opciones:
+   # -a = archive mode. same as -rlptgoD
+   # -t = preserve modification times
+   # -v = verbose
+   # -h = human readable progress
+   # -z = compress
+   # -s = no space-splitting; wildcard chars only
+   # --progress = show progress during transfer
+   # -e = specify the remote shell to use
+   # -c = skip based on checksum, not mod-time & size
+   # --delete = deletes destination files if no longer exist
+   # -n = dry-run
+   # -b = backup
+   # --backup-dir=$PWD/rsync/backup_$(date +%y%m%d%H%M)  ==> Con esta opcion nos generaría backups incrementales por fecha en el directorio de backup
+   # --compare-dest=$PWD/rsync/backup_$(date +%y%m%d%H%M)  ==> Con esta opcion nos generaría backups incrementales por fecha en el directorio destino
+   # --copy-dest=$PWD/rsync/backup_$(date +%y%m%d%H%M)  ==> Con esta opcion nos generaría backups incrementales por fecha en el directorio destino, copiando localmente los que ya tengamos
+   # --link-dest=$PWD/rsync/backup_$(date +%y%m%d%H%M)  ==> Con esta opcion nos generaría backups incrementales por fecha en el directorio destino, linkando localmente los que ya tengamos
+   # --exclude=PATTERN       exclude files matching PATTERN
+   # --exclude-from=FILE     read exclude patterns from FILE
+   # --include=PATTERN       don't exclude files matching PATTERN
+   # --include-from=FILE     read include patterns from FILE
+   # --files-from=FILE       read list of source-file names from FILE
+   
+   rm -rf ${_latest_dir}
+   rsync -av -b -z -c -s -e ssh --delete --prune-empty-dirs --link-dest=${_backup1} --include-from=${_remote_filelist} ${_user}@${_machine}:/ ${_backup0}  &>> ${LOG_FILE}
+
+   if [ $? -eq 0 ]
+   then
+      # Delete oldest backup
+      rm -rf ${_local_dir}/backup.${_numbackups} > /dev/null 2>&1
+
+      # Move previous backup (rolling index)
+      declare -i _index=${num_backups}
+      declare -i _previous=${num_backups}-1
+      until [ $_previous -lt 0 ]
+      do
+         mv ${_local_dir}/backup.${_previous} ${_local_dir}/backup.${_index} > /dev/null 2>&1
+         _index=${_index}-1
+         _previous=${_previous}-1         
+      done
+   fi   
+   ln -s ${_backup1} ${_latest_dir}
+}
+
+
+function diff_withremote_files () {
+   local _remote=$1
+   local _local_dir=$2
+   local _environment=$3
+   local _machine=$4
+   local _user=$5
+   
+   local _latest_dir=${_local_dir}/latest 
+   local _current_dir=${_local_dir}/backup_$(date +%y%m%d%H%M)
+   
+   rsync -av -z -c -i --include-from=${_remote} ${_user}@${_machine}:/ ${_latest_dir}
+}
+
+#
+# $1: environment
+# $2: machine
+#
+function isFE(){
+   local _environment=$1
+   local _machine=$2
+   
+   cfg_section_${_environment}
+   
+   for host in ${fe[@]}
+   do
+      if [[ "$_machine" == "$host" ]]
+      then
+         echo 1
+         return
+      fi
+   done
+   echo 0
+   return
+}
+
+
+
+#
+# $1: environment
+# $2: machine
+#
+function isBE(){
+   local _environment=$1
+   local _machine=$2
+   
+   cfg_section_${_environment}
+   
+   for host in ${be[@]}
+   do
+      if [[ "$_machine" == "$host" ]]
+      then
+         echo 1
+         return
+      fi
+   done
+   echo 0
+   return
+}
+
+#
+# $1: environment
+# $2: machine
+#
+function isAdmin(){
+   local _environment=$1
+   local _machine=$2
+   
+   cfg_section_${_environment}
+   
+   for host in ${admin[@]}
+   do
+      if [[ "$_machine" == "$host" ]]
+      then
+         echo 1
+         return
+      fi
+   done
+   echo 0
+   return
+}
+
+#
+# $1: environment
+#
+function existEnvironment(){
+   local _environment=$1
+   
+   for environment in ${environments[@]}
+   do
+      if [[ "$_environment" == "$environment" ]]
+      then
+         echo 1
+         return
+      fi
+   done
+   echo 0
+   return
+}
+
+#
+# $1: machine
+#
+function existMachine(){
+   local _machine=${1}
+   local _environment=${_machine:0:5}
+   
+   cfg_section_${_environment}
+   for machine in ${machines[@]}
+   do
+      if [[ "$_machine" == "$machine" ]]
+      then
+         echo 1
+         return
+      fi
+   done
+   echo 0
+   return
+}
+
+tstamp=$(date +%d%m%y)
+
